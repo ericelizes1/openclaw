@@ -118,7 +118,7 @@ const crossSessionMemoryPlugin = {
   id: "cross-session-memory",
   name: "Cross-Session Memory",
   description: "Short-term memory across sessions for the same agent",
-  kind: "memory",
+  kind: "context",
   configSchema,
 
   register(api: OpenClawPluginApi) {

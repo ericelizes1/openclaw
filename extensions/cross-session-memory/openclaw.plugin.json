@@ -1,6 +1,6 @@
 {
   "id": "cross-session-memory",
-  "kind": "memory",
+  "kind": "context",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
