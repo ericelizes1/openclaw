@@ -1,0 +1,35 @@
+{
+  "id": "cross-session-memory",
+  "kind": "memory",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "cacheMinutes": {
+        "type": "number",
+        "description": "How far back to look for messages (minutes)",
+        "default": 30
+      },
+      "maxMessages": {
+        "type": "number",
+        "description": "Max messages to inject",
+        "default": 20
+      },
+      "maxChars": {
+        "type": "number",
+        "description": "Max characters to inject",
+        "default": 2000
+      },
+      "excludeChannels": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Channel IDs to exclude (e.g., log channels)"
+      },
+      "includeChannels": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Only include channels in this list (if set)"
+      }
+    }
+  }
+}

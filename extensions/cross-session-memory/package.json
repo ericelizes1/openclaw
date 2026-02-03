@@ -1,0 +1,9 @@
+{
+  "name": "@openclaw/cross-session-memory",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.ts",
+  "peerDependencies": {
+    "openclaw": "*"
+  }
+}
