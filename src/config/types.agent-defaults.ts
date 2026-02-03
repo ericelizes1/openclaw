@@ -153,6 +153,13 @@ export type AgentDefaultsConfig = {
    * idleMs: wait time before flushing when idle.
    */
   blockStreamingCoalesce?: BlockStreamingCoalesceConfig;
+  /**
+   * Buffer all replies until the response is complete before sending.
+   * When enabled, suppresses intermediate block streaming and tool result delivery,
+   * sending only a single concatenated message at the end.
+   * Useful for preventing narration text and tool errors from leaking to channels.
+   */
+  bufferReplies?: boolean;
   /** Human-like delay between block replies. */
   humanDelay?: HumanDelayConfig;
   timeoutSeconds?: number;

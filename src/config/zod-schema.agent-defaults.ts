@@ -121,6 +121,7 @@ export const AgentDefaultsSchema = z
     blockStreamingBreak: z.union([z.literal("text_end"), z.literal("message_end")]).optional(),
     blockStreamingChunk: BlockStreamingChunkSchema.optional(),
     blockStreamingCoalesce: BlockStreamingCoalesceSchema.optional(),
+    bufferReplies: z.boolean().optional(),
     humanDelay: HumanDelaySchema.optional(),
     timeoutSeconds: z.number().int().positive().optional(),
     mediaMaxMb: z.number().positive().optional(),

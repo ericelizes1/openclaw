@@ -292,6 +292,11 @@ export async function dispatchReplyFromConfig(params: {
     let accumulatedBlockText = "";
     let blockCount = 0;
 
+    // Buffer replies mode: suppress intermediate delivery and send only final message.
+    // This prevents narration text and tool errors from leaking to channels.
+    const bufferReplies = cfg?.agents?.defaults?.bufferReplies ?? false;
+    const bufferedPayloads: ReplyPayload[] = [];
+
     const replyResult = await (params.replyResolver ?? getReplyFromConfig)(
       ctx,
       {
@@ -300,6 +305,11 @@ export async function dispatchReplyFromConfig(params: {
           ctx.ChatType !== "group" && ctx.CommandSource !== "native"
             ? (payload: ReplyPayload) => {
                 const run = async () => {
+                  // When bufferReplies is enabled, skip tool result delivery entirely.
+                  // Tool results are internal; we only want the final response.
+                  if (bufferReplies) {
+                    return;
+                  }
                   const ttsPayload = await maybeApplyTtsToPayload({
                     payload,
                     cfg,
@@ -327,6 +337,14 @@ export async function dispatchReplyFromConfig(params: {
               accumulatedBlockText += payload.text;
               blockCount++;
             }
+
+            // When bufferReplies is enabled, buffer payloads instead of sending.
+            // We'll concatenate and send them as a single final reply.
+            if (bufferReplies) {
+              bufferedPayloads.push(payload);
+              return;
+            }
+
             const ttsPayload = await maybeApplyTtsToPayload({
               payload,
               cfg,
@@ -347,7 +365,27 @@ export async function dispatchReplyFromConfig(params: {
       cfg,
     );
 
-    const replies = replyResult ? (Array.isArray(replyResult) ? replyResult : [replyResult]) : [];
+    let replies = replyResult ? (Array.isArray(replyResult) ? replyResult : [replyResult]) : [];
+
+    // When bufferReplies is enabled and we have buffered payloads but no final replies,
+    // concatenate the buffered text into a single final reply.
+    if (bufferReplies && bufferedPayloads.length > 0 && replies.length === 0) {
+      const concatenatedText = bufferedPayloads
+        .map((p) => p.text?.trim())
+        .filter(Boolean)
+        .join("\n\n");
+      if (concatenatedText) {
+        // Use the last buffered payload's metadata (replyToId, etc.) if present
+        const lastPayload = bufferedPayloads[bufferedPayloads.length - 1];
+        replies = [
+          {
+            text: concatenatedText,
+            replyToId: lastPayload?.replyToId,
+            audioAsVoice: lastPayload?.audioAsVoice,
+          },
+        ];
+      }
+    }
 
     let queuedFinal = false;
     let routedFinalCount = 0;
