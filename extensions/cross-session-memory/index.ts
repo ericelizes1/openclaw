@@ -130,6 +130,42 @@ const crossSessionMemoryPlugin = {
     const includeChannels = pluginConfig.includeChannels;
 
     // ========================================================================
+    // Helper: Find agent by channel binding
+    // ========================================================================
+    function findAgentByChannel(channelId: string | undefined): { id: string; workspace: string } | undefined {
+      if (!channelId) return undefined;
+      
+      // Check bindings first
+      const bindings = api.config.bindings ?? [];
+      for (const binding of bindings) {
+        const peer = binding.match?.peer;
+        if (peer?.kind === "channel" && peer?.id === channelId) {
+          const agentId = binding.agentId;
+          const agentConfig = api.config.agents?.list?.find((a) => a.id === agentId);
+          if (agentConfig?.workspace) {
+            return { id: agentId, workspace: agentConfig.workspace };
+          }
+        }
+      }
+      
+      // Check broadcast config
+      const broadcast = api.config.broadcast as Record<string, unknown> | undefined;
+      if (broadcast && channelId in broadcast) {
+        const agents = broadcast[channelId];
+        if (Array.isArray(agents) && agents.length > 0) {
+          // Use first agent in broadcast list
+          const agentId = agents[0];
+          const agentConfig = api.config.agents?.list?.find((a) => a.id === agentId);
+          if (agentConfig?.workspace) {
+            return { id: agentId, workspace: agentConfig.workspace };
+          }
+        }
+      }
+      
+      return undefined;
+    }
+
+    // ========================================================================
     // message_received hook: Cache incoming messages
     // ========================================================================
     api.on("message_received", async (event, ctx) => {
@@ -143,18 +179,17 @@ const crossSessionMemoryPlugin = {
         return;
       }
 
-      // Get workspace directory from config
-      const agentConfig = api.config.agents?.list?.find(
-        (a) => ctx.sessionKey?.includes(`agent:${a.id}:`)
-      );
-      const workspaceDir = agentConfig?.workspace ?? api.config.agents?.defaults?.workspace;
+      // Get workspace directory from channel binding
+      const channelId = ctx.conversationId;
+      const agentInfo = findAgentByChannel(channelId);
+      const workspaceDir = agentInfo?.workspace ?? api.config.agents?.defaults?.workspace;
 
       if (!workspaceDir) {
+        api.logger.warn?.("cross-session-memory: no workspace found for channel " + channelId);
         return;
       }
 
       // Check channel filters
-      const channelId = ctx.conversationId;
       if (channelId) {
         if (excludeChannels.includes(channelId)) {
           return;
@@ -164,6 +199,7 @@ const crossSessionMemoryPlugin = {
         }
       }
 
+      api.logger.info?.(`cross-session-memory: caching message from ${event.from} in ${workspaceDir}`);
       const cachePath = getCachePath(workspaceDir);
       const cache = await loadCache(cachePath);
 
@@ -172,9 +208,14 @@ const crossSessionMemoryPlugin = {
       const prunedCache = pruneCache(cache, maxAgeMs);
 
       // Add new message
+      // Construct a pseudo-session key from channel info since message_received doesn't have sessionKey
+      const pseudoSessionKey = agentInfo?.id && channelId
+        ? `agent:${agentInfo.id}:discord:channel:${channelId}`
+        : channelId ?? "unknown";
+      
       const newMessage: CachedMessage = {
         timestamp: event.timestamp ?? Date.now(),
-        sessionKey: ctx.sessionKey ?? "unknown",
+        sessionKey: pseudoSessionKey,
         channelId: ctx.conversationId,
         from: event.from,
         content: event.content.trim(),
